@@ -58,6 +58,14 @@ See [docs/performance.md](docs/performance.md).
 
 ## Install
 
+One line, no clone needed:
+
+```
+curl -fsSL https://raw.githubusercontent.com/HanSoBored/opencode-termux/main/install.sh | bash
+```
+
+Or, if you prefer to read the installer before running it:
+
 ```
 git clone https://github.com/HanSoBored/opencode-termux.git
 cd opencode-termux
@@ -75,6 +83,10 @@ cd opencode-termux
    ~/.opencode/bin/opencode-bin      # the unpatched opencode binary
    ~/.opencode/lib/libseccomp-shim.so
    ```
+
+When run through `curl | bash` there is no checkout, so the script fetches
+just the two files it needs (`src/libseccomp-shim.c`, `src/opencode`) from
+`raw.githubusercontent.com` instead of cloning the repo.
 
 ## Usage
 

@@ -6,17 +6,29 @@
 # ~/.opencode/ so opencode runs natively on Termux (Android 10/11).
 #
 # Usage: ./install.sh
+#        curl -fsSL https://raw.githubusercontent.com/HanSoBored/opencode-termux/main/install.sh | bash
 # Env:   OPENCODE_REPO=anomalyco/opencode      repo owning the release
 #        OPENCODE_VERSION=vX.Y.Z or "latest"   release to fetch (default: latest)
 #        OPENCODE_DIR=~/.opencode              install location
 #        OPENCODE_FORCE=1                      re-download even if binary exists
+#        OPENCODE_RAW_REPO / OPENCODE_REF       where to fetch src/ from when not
+#                                               running inside a checkout
 set -euo pipefail
 
 OPENCODE_REPO="${OPENCODE_REPO:-anomalyco/opencode}"
 OPENCODE_VERSION="${OPENCODE_VERSION:-latest}"
 OPENCODE_DIR="${OPENCODE_DIR:-$HOME/.opencode}"
+OPENCODE_RAW_REPO="${OPENCODE_RAW_REPO:-HanSoBored/opencode-termux}"
+OPENCODE_REF="${OPENCODE_REF:-main}"
 ARCH="$(uname -m)"
-SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# When piped to bash there is no script file, so fall back to the CWD and let
+# the source fetch below pull src/ straight from GitHub.
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    SRC_DIR="$PWD"
+fi
 
 say()  { printf '\033[1;32m[opencode-termux]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[opencode-termux]\033[0m %s\n' "$*"; }
@@ -32,8 +44,20 @@ die()  { printf '\033[1;31m[opencode-termux]\033[0m ERROR: %s\n' "$*" >&2; exit 
 command -v clang >/dev/null || die "clang not found. Install it: pkg install clang"
 command -v curl  >/dev/null || die "curl not found. Install it: pkg install curl"
 
-[ -f "$SRC_DIR/src/libseccomp-shim.c" ] || die "src/libseccomp-shim.c missing — run from the opencode-termux checkout"
-[ -f "$SRC_DIR/src/opencode" ]          || die "src/opencode missing — run from the opencode-termux checkout"
+# Not running from a checkout (curl | bash): pull just the two source files we
+# need straight off GitHub instead of cloning the whole repo.
+SRC_TMP=""
+if [ ! -f "$SRC_DIR/src/libseccomp-shim.c" ] || [ ! -f "$SRC_DIR/src/opencode" ]; then
+    say "no local checkout — fetching src/ from $OPENCODE_RAW_REPO@$OPENCODE_REF ..."
+    SRC_TMP="$(mktemp -d)"
+    SRC_DIR="$SRC_TMP"
+    mkdir -p "$SRC_DIR/src"
+    RAW="https://raw.githubusercontent.com/$OPENCODE_RAW_REPO/$OPENCODE_REF"
+    curl -fsSL "$RAW/src/libseccomp-shim.c" -o "$SRC_DIR/src/libseccomp-shim.c" \
+        || die "could not fetch src/libseccomp-shim.c from $RAW"
+    curl -fsSL "$RAW/src/opencode"          -o "$SRC_DIR/src/opencode" \
+        || die "could not fetch src/opencode from $RAW"
+fi
 
 mkdir -p "$OPENCODE_DIR/bin" "$OPENCODE_DIR/lib"
 
@@ -92,4 +116,7 @@ esac
 # ---------------------------------------------------------------- 4. verify
 say "verifying ..."
 "$OPENCODE_DIR/bin/opencode" --version || die "opencode failed to start"
+
+if [ -n "$SRC_TMP" ]; then rm -rf "$SRC_TMP"; fi
+
 say "done. Run: opencode"
